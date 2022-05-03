@@ -8,6 +8,7 @@ import Codec.Picture
 import System.Environment
 import Data.Array.CArray
 import Control.Applicative
+import Data.Bits
 
 type Array2D = CArray (Int, Int) Double
 
@@ -44,41 +45,65 @@ fromChannels r g b a = generateImage f w h
     f x y = PixelRGB8 (f' r) (f' g) (f' b)
       where
         i = (y, x)
-        f' pixels = truncate (limit $ pixels ! i)
+        f' pixels = truncate (limit 0 255 $ pixels ! i)
 
 --limit :: Double -> Double
-limit x | x < 0     = 0
-        | x > 255   = 255
-        | otherwise = x
+limit low high x | x < low    = low
+                 | x > high   = high
+                 | otherwise  = x
 
-dctImg img = fromChannels r' g' b'
-  where
-    r' = dct2 . channelR $ img
-    g' = dct2 . channelG $ img
-    b' = dct2 . channelB $ img
+-- dctImg img = fromChannels r' g' b'
+--   where
+--     r' = dct2 . channelR $ img
+--     g' = dct2 . channelG $ img
+--     b' = dct2 . channelB $ img
 
 blurhash :: (Int, Int) -> Image PixelRGB8 -> String
-blurhash (nx, ny) img = generateHash numComponents maxAC avgColor componentsAC
+blurhash (nx, ny) img =
+  (hash83 1 nc) ++ (hash83 1 $ round qntAC) ++ (hash83 4 dc) ++ (map (hash83 2) compsAC)
   where
-    numComponents = (nx - 1) + (ny - 1) * 9
-    dctR = dct2 . channelR $ img
-    dctG = dct2 . channelG $ img
-    dctB = dct2 . channelB $ img
+    nc   = (nx - 1) + (ny - 1) * 9
+
+    -- should this `take` be before the dct2?
+    dctR = take nc . elems . dct2 . channelR $ img
+    dctG = take nc . elems . dct2 . channelG $ img
+    dctB = take nc . elems . dct2 . channelB $ img
+
+    -- average color
+    dc   = encodeDC (dctR ! (0, 0)) (dctG ! (0, 0)) (dctB ! (0, 0))
+
     maxAC = maximum [maximum $ elems dctR, maximum $ elems dctG, maximum $ elems dctB]
-    avgColor = combineRGB (dctR ! (0, 0)) (dctG ! (0, 0)) (dctB ! (0, 0)) -- DC value
-    componentsAC =
-      zipWith3C (\r g b -> r * (19 * 19) + g * 19 + b) dctR dctG dctB :: Array2D
-      --zipWith3 (\r g b -> r * (19 * 19) + g * 19 + b) (elems dctR) (elems dctG) (elems dctB)
 
--- TODO this needs to put this into a single number
-combineRGB r g b = r + g + b
+    -- this is from their code, not from their description
+    qntAC = limit 0 82 $ actual_max * 166 - 0.5
 
--- TODO make this actually correct
-generateHash nc maxAC avgColor comps =
-  (show nc) ++ (show maxAC) ++ (show avgColor) ++ (show . bounds $ comps)
+    comps = zipWith3 (encodeAC maxAC) dctR dctG dctB
+
+-- FIXME this isn't correct because the underlying r g b values aren't correct.
+-- they're supposed to be 0-255 (8-bits), but in fact are doubles.
+-- this is my fault.
+encodeDC :: Double -> Double -> Double -> Int
+encodeDC r g b = fromIntegral . toInteger $ (r' `shift` 16) + (g' `shift` 8) + b'
+  where
+    r' = round r :: Pixel8
+    g' = round g :: Pixel8
+    b' = round b :: Pixel8
+
+-- this is from their code, not their description
+encodeAC :: Int -> Double -> Double -> Double -> Int
+encodeAC maxV r g b = r' * (19 * 19) + g' * 19 + b'
+  where
+    r' = limit 0 18 $ ((r / maxV) `pow` 0.5) * 9 + 9.5
+    g' = limit 0 18 $ ((g / maxV) `pow` 0.5) * 9 + 9.5
+    b' = limit 0 18 $ ((b / maxV) `pow` 0.5) * 9 + 9.5
 
 zipWith3C f xs ys zs =
   listArray (bounds xs) $ fmap (liftA3 f (xs !) (ys !) (zs !)) (range (bounds xs))
+
+hash83 :: Int -> String
+hash83 value = (cipher !! (fromIntegral value)) : []
+  where
+    cipher = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz#$%*+,-.:;=?@[]^_{|}~"
 
 main = do
   (imgPath:_) <- getArgs
@@ -90,9 +115,13 @@ main = do
   let dctG = dct2 . channelG $ img
   let dctB = dct2 . channelB $ img
   let maxAC = maximum [maximum $ elems dctR, maximum $ elems dctG, maximum $ elems dctB]
-  let avgColor = combineRGB (dctR ! (0, 0)) (dctG ! (0, 0)) (dctB ! (0, 0)) -- DC value
+  let avgColor = encodeDC (dctR ! (0, 0)) (dctG ! (0, 0)) (dctB ! (0, 0)) -- DC value
   let componentsAC =
         zipWith3C (\r g b -> r * (19 * 19) + g * 19 + b) dctR dctG dctB :: Array2D
 
+  print . show $ numComponents
+  print . show $ maxAC
+  print . show $ dctR ! (0, 0)
+  print . show $ avgColor -- DC value
   print . blurhash (3, 3) $ img
 
