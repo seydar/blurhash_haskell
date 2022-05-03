@@ -16,7 +16,10 @@ toRGB8 (Left _)  = undefined
 toRGB8 (Right img) = convertRGB8 img
 
 oneDim :: (Pixel p) => Image p -> [p]
-oneDim img = [pixelAt img i j | i <- [0..imageWidth img], j <- [0..imageHeight img]]
+oneDim img = [pixelAt img i j | i <- [0..w], j <- [0..h]]
+  where
+    h = (imageHeight img) - 1
+    w = (imageWidth img) - 1
 
 pixelR, pixelG, pixelB :: PixelRGB8 -> Pixel8
 pixelR (PixelRGB8 r _ _) = r
@@ -48,32 +51,31 @@ limit x | x < 0     = 0
         | x > 255   = 255
         | otherwise = x
 
--- dctImg img = fromChannels r' g' b' a'
---   where
---     r' = dct2 . channelR $ img
---     g' = dct2 . channelG $ img
---     b' = dct2 . channelB $ img
---     a' = dct2 . channelA $ img
+dctImg img = fromChannels r' g' b'
+  where
+    r' = dct2 . channelR $ img
+    g' = dct2 . channelG $ img
+    b' = dct2 . channelB $ img
 
--- blurhash :: (Int, Int) -> Image PixelRGBA8 -> String
--- blurhash (nx, ny) img = generateHash numComponents maxAC avgColor componentsAC
---   where
---     numComponents = (nx - 1) + (ny - 1) * 9
---     dctR = dct2 . channelR $ img
---     dctG = dct2 . channelG $ img
---     dctB = dct2 . channelB $ img
---     maxAC = maximum [maximum $ elems dctR, maximum $ elems dctG, maximum $ elems dctB]
---     avgColor = combineRGB (dctR ! (0, 0)) (dctG ! (0, 0)) (dctB ! (0, 0)) -- DC value
---     componentsAC =
---       zipWith3C (\r g b -> r * (19 * 19) + g * 19 + b) dctR dctG dctB :: Array2D
---       --zipWith3 (\r g b -> r * (19 * 19) + g * 19 + b) (elems dctR) (elems dctG) (elems dctB)
+blurhash :: (Int, Int) -> Image PixelRGB8 -> String
+blurhash (nx, ny) img = generateHash numComponents maxAC avgColor componentsAC
+  where
+    numComponents = (nx - 1) + (ny - 1) * 9
+    dctR = dct2 . channelR $ img
+    dctG = dct2 . channelG $ img
+    dctB = dct2 . channelB $ img
+    maxAC = maximum [maximum $ elems dctR, maximum $ elems dctG, maximum $ elems dctB]
+    avgColor = combineRGB (dctR ! (0, 0)) (dctG ! (0, 0)) (dctB ! (0, 0)) -- DC value
+    componentsAC =
+      zipWith3C (\r g b -> r * (19 * 19) + g * 19 + b) dctR dctG dctB :: Array2D
+      --zipWith3 (\r g b -> r * (19 * 19) + g * 19 + b) (elems dctR) (elems dctG) (elems dctB)
 
+-- TODO this needs to put this into a single number
 combineRGB r g b = r + g + b
 
 -- TODO make this actually correct
 generateHash nc maxAC avgColor comps =
   (show nc) ++ (show maxAC) ++ (show avgColor) ++ (show . bounds $ comps)
-  --(show nc) ++ (show maxAC) ++ (show avgColor) ++ (show . length $ comps)
 
 zipWith3C f xs ys zs =
   listArray (bounds xs) $ fmap (liftA3 f (xs !) (ys !) (zs !)) (range (bounds xs))
@@ -84,14 +86,13 @@ main = do
   let img = toRGB8 dynImg
   let (nx, ny) = (3, 3)
   let numComponents = (nx - 1) + (ny - 1) * 9
-  --let dctR = dct2 . channelR $ img
-  --let dctG = dct2 . channelG $ img
-  --let dctB = dct2 . channelB $ img
-  --let maxAC = maximum [maximum $ elems dctR, maximum $ elems dctG, maximum $ elems dctB]
-  --let avgColor = combineRGB (dctR ! (0, 0)) (dctG ! (0, 0)) (dctB ! (0, 0)) -- DC value
-  --let componentsAC =
-  --      zipWith3C (\r g b -> r * (19 * 19) + g * 19 + b) dctR dctG dctB :: Array2D
+  let dctR = dct2 . channelR $ img
+  let dctG = dct2 . channelG $ img
+  let dctB = dct2 . channelB $ img
+  let maxAC = maximum [maximum $ elems dctR, maximum $ elems dctG, maximum $ elems dctB]
+  let avgColor = combineRGB (dctR ! (0, 0)) (dctG ! (0, 0)) (dctB ! (0, 0)) -- DC value
+  let componentsAC =
+        zipWith3C (\r g b -> r * (19 * 19) + g * 19 + b) dctR dctG dctB :: Array2D
 
-  --print . ("cool " ++) . show . blurhash (3, 3) $ img
-  print . show . bounds $ channelR img
+  print . blurhash (3, 3) $ img
 

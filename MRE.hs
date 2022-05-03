@@ -13,7 +13,10 @@ toRGB8 (Left _)  = undefined
 toRGB8 (Right img) = convertRGB8 img
 
 oneDim :: (Pixel p) => Image p -> [p]
-oneDim img = [pixelAt img i j | i <- [0..imageWidth img], j <- [0..imageHeight img]]
+oneDim img = [pixelAt img i j | i <- [0..w], j <- [0..h]]
+  where
+    h = (imageHeight img) - 1
+    w = (imageWidth img) - 1
 
 -- FIXME `listArray` line creates an array that has the index out of bounds
 extractChannel :: (PixelRGB8 -> Pixel8) -> Image PixelRGB8 -> Array2D
@@ -43,7 +46,8 @@ main = do
   dynImg <- readImage imgPath -- Either String DynamicImage
   let img = toRGB8 dynImg
 
-  print . show . length $ oneDim img
+  print . show . imageWidth $ img
+  print . show . imageHeight $ img
   print . show . length $ channelR' img
   print . show . bounds $ channelR img
 
