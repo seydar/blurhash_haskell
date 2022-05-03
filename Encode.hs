@@ -60,28 +60,25 @@ limit low high x | x < low    = low
 
 blurhash :: (Int, Int) -> Image PixelRGB8 -> String
 blurhash (nx, ny) img =
-  (hash83 1 nc) ++ (hash83 1 $ round qntAC) ++ (hash83 4 dc) ++ (map (hash83 2) compsAC)
+  (hash83 1 nc) ++ (hash83 1 $ round qntAC) ++ (hash83 4 dc) ++ (foldr (\ac str -> (hash83 2 ac) ++ str) "" comps)
   where
-    nc   = (nx - 1) + (ny - 1) * 9
+    nc    = (nx - 1) + (ny - 1) * 9
 
     -- should this `take` be before the dct2?
-    dctR = take nc . elems . dct2 . channelR $ img
-    dctG = take nc . elems . dct2 . channelG $ img
-    dctB = take nc . elems . dct2 . channelB $ img
+    dctR  = take nc . elems . dct2 . channelR $ img
+    dctG  = take nc . elems . dct2 . channelG $ img
+    dctB  = take nc . elems . dct2 . channelB $ img
 
     -- average color
-    dc   = encodeDC (dctR ! (0, 0)) (dctG ! (0, 0)) (dctB ! (0, 0))
+    dc    = encodeDC (dctR !! 0) (dctG !! 0) (dctB !! 0)
 
-    maxAC = maximum [maximum $ elems dctR, maximum $ elems dctG, maximum $ elems dctB]
+    maxAC = maximum [maximum dctR, maximum dctG, maximum dctB]
 
     -- this is from their code, not from their description
-    qntAC = limit 0 82 $ actual_max * 166 - 0.5
+    qntAC = limit 0 82 $ maxAC * 166 - 0.5
 
-    comps = zipWith3 (encodeAC maxAC) dctR dctG dctB
+    comps = drop 1 $ zipWith3 (encodeAC maxAC) dctR dctG dctB
 
--- FIXME this isn't correct because the underlying r g b values aren't correct.
--- they're supposed to be 0-255 (8-bits), but in fact are doubles.
--- this is my fault.
 encodeDC :: Double -> Double -> Double -> Int
 encodeDC r g b = fromIntegral . toInteger $ (r' `shift` 16) + (g' `shift` 8) + b'
   where
@@ -90,38 +87,29 @@ encodeDC r g b = fromIntegral . toInteger $ (r' `shift` 16) + (g' `shift` 8) + b
     b' = round b :: Pixel8
 
 -- this is from their code, not their description
-encodeAC :: Int -> Double -> Double -> Double -> Int
-encodeAC maxV r g b = r' * (19 * 19) + g' * 19 + b'
+encodeAC :: Double -> Double -> Double -> Double -> Int
+encodeAC maxV r g b = round $ r' * (19 * 19) + g' * 19 + b'
   where
-    r' = limit 0 18 $ ((r / maxV) `pow` 0.5) * 9 + 9.5
-    g' = limit 0 18 $ ((g / maxV) `pow` 0.5) * 9 + 9.5
-    b' = limit 0 18 $ ((b / maxV) `pow` 0.5) * 9 + 9.5
+    r' = limit 0 18 $ ((r / maxV) ** 0.5) * 9 + 9.5
+    g' = limit 0 18 $ ((g / maxV) ** 0.5) * 9 + 9.5
+    b' = limit 0 18 $ ((b / maxV) ** 0.5) * 9 + 9.5
 
-zipWith3C f xs ys zs =
-  listArray (bounds xs) $ fmap (liftA3 f (xs !) (ys !) (zs !)) (range (bounds xs))
+hash83 :: Int -> Int -> String
+hash83 places value = hash83' 1 places value
 
-hash83 :: Int -> String
-hash83 value = (cipher !! (fromIntegral value)) : []
-  where
-    cipher = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz#$%*+,-.:;=?@[]^_{|}~"
+hash83' :: Int -> Int -> Int -> String
+hash83' cur places value 
+  | cur == places = ""
+  | otherwise     = res : (hash83' (cur + 1) places value)
+    where
+      cipher = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz#$%*+,-.:;=?@[]^_{|}~"
+      digit  = (value `div` (83 ^ (places - cur))) `mod` 83
+      res    = cipher !! digit
 
 main = do
   (imgPath:_) <- getArgs
   dynImg <- readImage imgPath -- Either String DynamicImage
   let img = toRGB8 dynImg
-  let (nx, ny) = (3, 3)
-  let numComponents = (nx - 1) + (ny - 1) * 9
-  let dctR = dct2 . channelR $ img
-  let dctG = dct2 . channelG $ img
-  let dctB = dct2 . channelB $ img
-  let maxAC = maximum [maximum $ elems dctR, maximum $ elems dctG, maximum $ elems dctB]
-  let avgColor = encodeDC (dctR ! (0, 0)) (dctG ! (0, 0)) (dctB ! (0, 0)) -- DC value
-  let componentsAC =
-        zipWith3C (\r g b -> r * (19 * 19) + g * 19 + b) dctR dctG dctB :: Array2D
 
-  print . show $ numComponents
-  print . show $ maxAC
-  print . show $ dctR ! (0, 0)
-  print . show $ avgColor -- DC value
   print . blurhash (3, 3) $ img
 
