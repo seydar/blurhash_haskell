@@ -10,10 +10,6 @@ import Data.Bits
 
 type Array2D = CArray (Int, Int) Double
 
-toRGB8 :: Either String DynamicImage -> Image PixelRGB8
-toRGB8 (Left _)  = undefined
-toRGB8 (Right img) = convertRGB8 img
-
 oneDim :: (Pixel p) => Image p -> [p]
 oneDim img = [pixelAt img i j | i <- [0..w], j <- [0..h]]
   where
@@ -89,9 +85,9 @@ encodeDC r g b = fromIntegral . toInteger $ (r' `shift` 16) + (g' `shift` 8) + b
 encodeAC :: Double -> Double -> Double -> Double -> Int
 encodeAC maxV r g b = round $ r' * (19 * 19) + g' * 19 + b'
   where
-    r' = limit 0 18 $ ((r / maxV) ** 0.5) * 9 + 9.5
-    g' = limit 0 18 $ ((g / maxV) ** 0.5) * 9 + 9.5
-    b' = limit 0 18 $ ((b / maxV) ** 0.5) * 9 + 9.5
+    r' = limit 0 18 $ (sqrt (r / maxV)) * 9 + 9.5
+    g' = limit 0 18 $ (sqrt (g / maxV)) * 9 + 9.5
+    b' = limit 0 18 $ (sqrt (b / maxV)) * 9 + 9.5
 
 srgbToLinear :: Double -> Double
 srgbToLinear value = ((x' + 0.055) / 1.055) ** 2.4
@@ -105,7 +101,7 @@ linearToSrgb :: Double -> Double
 linearToSrgb value = fromIntegral $ floor ret
   where
     x   = limit 0 1 value
-    ret = if x == 0.0031308
+    ret = if x <= 0.0031308
           then x * 12.92 * 255 + 0.5
           else (1.055 * (x ** (1.0 / 2.4)) - 0.055) * 255 + 0.5
 
@@ -121,22 +117,33 @@ hash83' cur places value
       digit  = (value `div` (83 ^ (places - cur))) `mod` 83
       res    = cipher !! digit
 
+grayscale :: PixelRGB8 -> Double
+grayscale (PixelRGB8 r g b) = (0.2126 * r' + 0.7152 * g' + 0.0722 * b') / 255.0
+  where
+    r' = fromIntegral r
+    g' = fromIntegral g
+    b' = fromIntegral b
+
 main = do
   (imgPath:_) <- getArgs
-  dynImg <- readImage imgPath -- Either String DynamicImage
-  let img = toRGB8 dynImg
+  Right dynImg <- readImage imgPath -- Either String DynamicImage
+  let img = convertRGB8 dynImg
 
   let  (nx, ny) = (3, 3)
   let  num_c = nx * ny
+  let (w, h) = (fromIntegral $ imageWidth img, fromIntegral $ imageHeight img) :: (Double, Double)
 
-  let  -- should this `take` be before the dct2?
-  let  dctR  = take num_c . elems . amap linearToSrgb . dct2 . amap srgbToLinear . channelR $ img
-  let  dctG  = take num_c . elems . amap linearToSrgb . dct2 . amap srgbToLinear . channelG $ img
-  let  dctB  = take num_c . elems . amap linearToSrgb . dct2 . amap srgbToLinear . channelB $ img
+  -- should this `take` be before the dct2?
+  -- FIXME maybe multiply the dct2 output by the original input?
+  let  dctR  = take num_c . elems . dct2 . channelR $ img
+  let  dctG  = take num_c . elems . dct2 . channelG $ img
+  let  dctB  = take num_c . elems . dct2 . channelB $ img
+
+  let doc = take num_c . elems . dct2 . channelR $ img
   
-  print . show $ dctR
-  print . show $ dctG
-  print . show $ dctB
+  print (w, h)
+  print . show $ (channelR img) ! (4, 4)
+  print . show $ doc
 
   print $ encodeDC (head dctR) (head dctG) (head dctB)
 
