@@ -1,8 +1,6 @@
 -- heavily inspired/branched from
 -- https://github.com/phadej/JuicyPixels-scale-dct/blob/master/src/Codec/Picture/ScaleDCT.hs
 
---{-# LANGUAGE FlexibleContexts    #-}
-
 import Math.FFT
 import Codec.Picture
 import System.Environment
@@ -63,11 +61,12 @@ blurhash (nx, ny) img =
   (hash83 1 nc) ++ (hash83 1 $ round qntAC) ++ (hash83 4 dc) ++ (foldr (\ac str -> (hash83 2 ac) ++ str) "" comps)
   where
     nc    = (nx - 1) + (ny - 1) * 9
+    num_c = nx * ny
 
     -- should this `take` be before the dct2?
-    dctR  = take nc . elems . dct2 . channelR $ img
-    dctG  = take nc . elems . dct2 . channelG $ img
-    dctB  = take nc . elems . dct2 . channelB $ img
+    dctR  = take num_c . elems . amap linearToSrgb . dct2 . amap srgbToLinear . channelR $ img
+    dctG  = take num_c . elems . amap linearToSrgb . dct2 . amap srgbToLinear . channelG $ img
+    dctB  = take num_c . elems . amap linearToSrgb . dct2 . amap srgbToLinear . channelB $ img
 
     -- average color
     dc    = encodeDC (dctR !! 0) (dctG !! 0) (dctB !! 0)
@@ -82,9 +81,9 @@ blurhash (nx, ny) img =
 encodeDC :: Double -> Double -> Double -> Int
 encodeDC r g b = fromIntegral . toInteger $ (r' `shift` 16) + (g' `shift` 8) + b'
   where
-    r' = round r :: Pixel8
-    g' = round g :: Pixel8
-    b' = round b :: Pixel8
+    r' = round r :: Int
+    g' = round g :: Int
+    b' = round b :: Int
 
 -- this is from their code, not their description
 encodeAC :: Double -> Double -> Double -> Double -> Int
@@ -94,12 +93,28 @@ encodeAC maxV r g b = round $ r' * (19 * 19) + g' * 19 + b'
     g' = limit 0 18 $ ((g / maxV) ** 0.5) * 9 + 9.5
     b' = limit 0 18 $ ((b / maxV) ** 0.5) * 9 + 9.5
 
+srgbToLinear :: Double -> Double
+srgbToLinear value = ((x' + 0.055) / 1.055) ** 2.4
+  where
+    x = value / 255.0
+    x' = if x <= 0.04045
+         then x / 12.92
+         else x
+
+linearToSrgb :: Double -> Double
+linearToSrgb value = fromIntegral $ floor ret
+  where
+    x   = limit 0 1 value
+    ret = if x == 0.0031308
+          then x * 12.92 * 255 + 0.5
+          else (1.055 * (x ** (1.0 / 2.4)) - 0.055) * 255 + 0.5
+
 hash83 :: Int -> Int -> String
 hash83 places value = hash83' 1 places value
 
 hash83' :: Int -> Int -> Int -> String
 hash83' cur places value 
-  | cur == places = ""
+  | cur > places = ""
   | otherwise     = res : (hash83' (cur + 1) places value)
     where
       cipher = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz#$%*+,-.:;=?@[]^_{|}~"
@@ -111,5 +126,21 @@ main = do
   dynImg <- readImage imgPath -- Either String DynamicImage
   let img = toRGB8 dynImg
 
+  let  (nx, ny) = (3, 3)
+  let  num_c = nx * ny
+
+  let  -- should this `take` be before the dct2?
+  let  dctR  = take num_c . elems . amap linearToSrgb . dct2 . amap srgbToLinear . channelR $ img
+  let  dctG  = take num_c . elems . amap linearToSrgb . dct2 . amap srgbToLinear . channelG $ img
+  let  dctB  = take num_c . elems . amap linearToSrgb . dct2 . amap srgbToLinear . channelB $ img
+  
+  print . show $ dctR
+  print . show $ dctG
+  print . show $ dctB
+
+  print $ encodeDC (head dctR) (head dctG) (head dctB)
+
+  -- cat.jpg should get us "KXL41nIA~q_2x]S5xvW=M|" for (3, 3)
+  print "KXL41nIA~q_2x]S5xvW=M|"
   print . blurhash (3, 3) $ img
 
