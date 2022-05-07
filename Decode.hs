@@ -3,7 +3,6 @@ import Codec.Picture
 import Data.List
 import Data.Maybe
 import Data.Bits
-import Debug.Trace
 
 type RGB = (Double, Double, Double)
 
@@ -45,7 +44,7 @@ numComponents :: String -> (Int, Int)
 numComponents hash = (nx, ny)
   where
     size = unhash hash 0 1
-    ny = ((traceShowId size) `div`  9) + 1
+    ny = (size `div`  9) + 1
     nx = (size `mod` 9) + 1
 
 maxValue :: String -> Double
@@ -77,7 +76,11 @@ decodeACs:: String -> [RGB]
 decodeACs hash = (decodeDC hash) : acs
   where
     (nx, ny) = numComponents hash
-    acValues = [unhash hash (4 + x * 2) (6 + x * 2) | x <- [0..nx * ny]]
+
+    -- this would normally go from 0..(nx * ny) - 1
+    -- but since we already have the first component from `decodeDC`, we
+    -- only need 1..(nx * ny) - 1
+    acValues = [unhash hash (4 + x * 2) (6 + x * 2) | x <- [1..(nx * ny) - 1]]
     acs = map (decodeAC (maxValue hash)) acValues
 
 decode :: String -> (Int, Int) -> Image PixelRGB8
@@ -103,7 +106,7 @@ makePixel acs (w, h) (nx, ny) x y = PixelRGB8 r' g' b'
     greens = map (\(_, g, _) -> g) acs
     blues  = map (\(_, _, b) -> b) acs
 
-    r = sum $ zipWith (*) (traceShow (x, y, nx, ny) bases) reds
+    r = sum $ zipWith (*) bases reds
     g = sum $ zipWith (*) bases greens
     b = sum $ zipWith (*) bases blues
 
@@ -114,12 +117,6 @@ makePixel acs (w, h) (nx, ny) x y = PixelRGB8 r' g' b'
 main = do
   (hash:w:h:file:[]) <- getArgs
   let (width, height) = (read w, read h) :: (Int, Int)
-  --let (width, height) = (419, 382)
-  --let hash = "K8Gaah0MNd=ro0nP-:-9xZ"
-
-  print $ numComponents hash
-  let (start, end) = (0, 1)
-  print $ take (end - start) . drop start $ hash
 
   let img = decode hash (width, height)
   savePngImage file $ ImageRGB8 img
