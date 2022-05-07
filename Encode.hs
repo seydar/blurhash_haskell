@@ -1,11 +1,10 @@
--- heavily inspired/branched from
--- https://github.com/phadej/JuicyPixels-scale-dct/blob/master/src/Codec/Picture/ScaleDCT.hs
-
 import Math.FFT
 import Codec.Picture
 import System.Environment
 import Control.Applicative
 import Data.Bits
+
+type RGB = (Double, Double, Double)
 
 oneDim :: (Pixel p) => Image p -> [p]
 oneDim img = [pixelAt img i j | j <- [0..h], i <- [0..w]]
@@ -30,10 +29,10 @@ limit low high x | x < low    = low
                  | x > high   = high
                  | otherwise  = x
 
-manualDCT :: Image PixelRGB8 -> (Int, Int) -> [(Double, Double, Double)]
+manualDCT :: Image PixelRGB8 -> (Int, Int) -> [RGB]
 manualDCT img (nx, ny) = [basisFunction img i j | j <- [0..ny - 1], i <- [0..nx - 1]]
 
-basisFunction :: Image PixelRGB8 -> Int -> Int -> (Double, Double, Double)
+basisFunction :: Image PixelRGB8 -> Int -> Int -> RGB
 basisFunction img i j = (r, g, b)
   where
     (w, h) = (fromIntegral $ imageWidth img, fromIntegral $ imageHeight img)
@@ -76,7 +75,7 @@ blurhash (nx, ny) img =
 
     comps = map (encodeAC maxAC') acs
 
-encodeDC :: (Double, Double, Double) -> Int
+encodeDC :: RGB -> Int
 encodeDC (r, g, b) = fromIntegral . toInteger $ (r' `shift` 16) + (g' `shift` 8) + b'
   where
     r' = round . linearToSrgb $ r :: Int
@@ -84,7 +83,7 @@ encodeDC (r, g, b) = fromIntegral . toInteger $ (r' `shift` 16) + (g' `shift` 8)
     b' = round . linearToSrgb $ b :: Int
 
 -- this is from their code, not their description
-encodeAC :: Double -> (Double, Double, Double) -> Int
+encodeAC :: Double -> RGB -> Int
 encodeAC maxV (r, g, b) = r' * (19 * 19) + g' * 19 + b'
   where
     r' = limit 0 18 . floor $ (signpow (r / maxV) 0.5) * 9 + 9.5
@@ -129,5 +128,6 @@ main = do
 
   -- cat.jpg should get us "KYLDf7IA~p^+x]S5xvW=M|" for (3, 3)
   -- cat.jpg should get us "ARLDf7Di~W%M" for (2, 2)
+  putStrLn $ "Generating blurhash for " ++ show w ++ "x" ++ show h ++ " image..."
   putStrLn . blurhash (x, y) $ img
 
