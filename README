@@ -1,1 +1,5 @@
 https://github.com/woltapp/blurhash
+
+TODO
+  implement this and see how close to blurhash you can get it
+  https://www.mathworks.com/help/images/discrete-cosine-transform.html
