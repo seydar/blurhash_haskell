@@ -1,4 +1,4 @@
-module Decode (decode) where
+module Blurhash.Decode (decode) where
 
 import System.Environment
 import Codec.Picture
@@ -6,27 +6,7 @@ import Data.List
 import Data.Maybe
 import Data.Bits
 
-type RGB = (Double, Double, Double)
-
-limit :: Ord a => a -> a -> a -> a
-limit low high x | x < low    = low
-                 | x > high   = high
-                 | otherwise  = x
-
-srgbToLinear :: Double -> Double
-srgbToLinear value = if x <= 0.04045
-                     then x / 12.92
-                     else ((x + 0.055) / 1.055) ** 2.4
-  where
-    x = value / 255.0
-
-linearToSrgb :: Double -> Int
-linearToSrgb value = floor ret
-  where
-    x   = limit 0 1 value
-    ret = if x <= 0.0031308
-          then x * 12.92 * 255 + 0.5
-          else (1.055 * (x ** (1.0 / 2.4)) - 0.055) * 255 + 0.5
+import Blurhash.Common
 
 unhash :: String -> Int -> Int -> Int
 unhash hash start end = unhash83 slice
@@ -61,8 +41,6 @@ decodeDC hash = (srgbToLinear r, srgbToLinear g, srgbToLinear b)
     r = fromIntegral $ avgColor `shift` (-16)
     g = fromIntegral $ (avgColor `shift` (-8)) .&. 255
     b = fromIntegral $ avgColor .&. 255
-
-signpow v e = (signum v) * (abs v) ** e
 
 decodeAC :: Double -> Int -> RGB
 decodeAC maxV ac = (r', g', b')

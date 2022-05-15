@@ -1,4 +1,4 @@
-module Encode (blurhash) where
+module Blurhash.Encode (blurhash) where
 
 import Math.FFT
 import Codec.Picture
@@ -6,7 +6,7 @@ import System.Environment
 import Control.Applicative
 import Data.Bits
 
-type RGB = (Double, Double, Double)
+import Blurhash.Common
 
 oneDim :: (Pixel p) => Image p -> [p]
 oneDim img = [pixelAt img i j | j <- [0..h], i <- [0..w]]
@@ -26,11 +26,6 @@ channelR = extractChannel pixelR
 channelG = extractChannel pixelG
 channelB = extractChannel pixelB
 
---limit :: Double -> Double
-limit low high x | x < low    = low
-                 | x > high   = high
-                 | otherwise  = x
-
 manualDCT :: Image PixelRGB8 -> (Int, Int) -> [RGB]
 manualDCT img (nx, ny) = [basisFunction img i j | j <- [0..ny - 1], i <- [0..nx - 1]]
 
@@ -38,7 +33,6 @@ basisFunction :: Image PixelRGB8 -> Int -> Int -> RGB
 basisFunction img i j = (r, g, b)
   where
     (w, h) = (fromIntegral $ imageWidth img, fromIntegral $ imageHeight img)
-    --(w, h) = (10, 11)
     (i', j') = (fromIntegral i, fromIntegral j)
 
     -- not sure why `x` and `y` are Doubles, but I'm not mad about it
@@ -80,11 +74,10 @@ blurhash (nx, ny) img =
 encodeDC :: RGB -> Int
 encodeDC (r, g, b) = fromIntegral . toInteger $ (r' `shift` 16) + (g' `shift` 8) + b'
   where
-    r' = round . linearToSrgb $ r :: Int
-    g' = round . linearToSrgb $ g :: Int
-    b' = round . linearToSrgb $ b :: Int
+    r' = linearToSrgb $ r :: Int
+    g' = linearToSrgb $ g :: Int
+    b' = linearToSrgb $ b :: Int
 
--- this is from their code, not their description
 encodeAC :: Double -> RGB -> Int
 encodeAC maxV (r, g, b) = r' * (19 * 19) + g' * 19 + b'
   where
@@ -92,22 +85,6 @@ encodeAC maxV (r, g, b) = r' * (19 * 19) + g' * 19 + b'
     g' = limit 0 18 . floor $ (signpow (g / maxV) 0.5) * 9 + 9.5
     b' = limit 0 18 . floor $ (signpow (b / maxV) 0.5) * 9 + 9.5
 
-signpow v e = (signum v) * (abs v) ** e
-
-srgbToLinear :: Double -> Double
-srgbToLinear value = if x <= 0.04045
-                     then x / 12.92
-                     else ((x + 0.055) / 1.055) ** 2.4
-  where
-    x = value / 255.0
-
-linearToSrgb :: Double -> Double
-linearToSrgb value = fromIntegral $ floor ret
-  where
-    x   = limit 0 1 value
-    ret = if x <= 0.0031308
-          then x * 12.92 * 255 + 0.5
-          else (1.055 * (x ** (1.0 / 2.4)) - 0.055) * 255 + 0.5
 
 hash83 :: Int -> Int -> String
 hash83 places value = hash83' 1 places value
