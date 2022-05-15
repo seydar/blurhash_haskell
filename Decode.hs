@@ -1,3 +1,5 @@
+module Decode (decode) where
+
 import System.Environment
 import Codec.Picture
 import Data.List

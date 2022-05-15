@@ -1,5 +1,18 @@
-https://github.com/woltapp/blurhash
+Haskell bindings for the [Blurhash](https://github.com/woltapp/blurhash)
+algorithm.
 
-TODO
+# Usage
+
+```
+% ghc -O2 Encode
+% ./Encode 3 3 images/cat.jpg
+Generating blurhash for 1199x1198 image...
+KYLDf7IA~p^+x]S5xvW=M|
+% ghc -O2 Decode
+% ./Decode "KYLDf7IA~p^+x]S5xvW=M|" 1199 1198 out.png
+Saved image to out.png
+```
+
+# TODO
   implement this and see how close to blurhash you can get it
   https://www.mathworks.com/help/images/discrete-cosine-transform.html

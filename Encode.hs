@@ -1,3 +1,5 @@
+module Encode (blurhash) where
+
 import Math.FFT
 import Codec.Picture
 import System.Environment
