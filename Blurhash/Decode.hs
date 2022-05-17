@@ -1,4 +1,4 @@
-module Blurhash.Decode (decode) where
+module Blurhash.Decode (blurDecode) where
 
 import System.Environment
 import Codec.Picture
@@ -63,8 +63,8 @@ decodeACs hash = (decodeDC hash) : acs
     acValues = [unhash hash (4 + x * 2) (6 + x * 2) | x <- [1..(nx * ny) - 1]]
     acs = map (decodeAC (maxValue hash)) acValues
 
-decode :: String -> (Int, Int) -> Image PixelRGB8
-decode hash (w, h) = generateImage (makePixel acs (w, h) (nx, ny)) w h
+blurDecode :: String -> (Int, Int) -> Image PixelRGB8
+blurDecode hash (w, h) = generateImage (makePixel acs (w, h) (nx, ny)) w h
   where
     (nx, ny) = numComponents hash
     acs = decodeACs hash
@@ -98,7 +98,7 @@ main = do
   (hash:w:h:file:[]) <- getArgs
   let (width, height) = (read w, read h) :: (Int, Int)
 
-  let img = decode hash (width, height)
+  let img = blurDecode hash (width, height)
   savePngImage file $ ImageRGB8 img
   putStrLn $ "Saved image to " ++ file
 

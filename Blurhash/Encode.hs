@@ -1,4 +1,4 @@
-module Blurhash.Encode (blurhash) where
+module Blurhash.Encode (blurEncode) where
 
 import Math.FFT
 import Codec.Picture
@@ -51,8 +51,8 @@ basisFunction img i j = (r, g, b)
     g = scale * (sum green)
     b = scale * (sum blue)
 
-blurhash :: (Int, Int) -> Image PixelRGB8 -> String
-blurhash (nx, ny) img =
+blurEncode :: (Int, Int) -> Image PixelRGB8 -> String
+blurEncode (nx, ny) img =
   (hash83 1 nc) ++ (hash83 1 qntAC) ++ (hash83 4 dc) ++ (foldr (\ac str -> (hash83 2 ac) ++ str) "" comps)
   where
     nc    = (nx - 1) + (ny - 1) * 9
@@ -108,5 +108,5 @@ main = do
   -- cat.jpg should get us "KYLDf7IA~p^+x]S5xvW=M|" for (3, 3)
   -- cat.jpg should get us "ARLDf7Di~W%M" for (2, 2)
   putStrLn $ "Generating blurhash for " ++ show w ++ "x" ++ show h ++ " image..."
-  putStrLn . blurhash (x, y) $ img
+  putStrLn . blurEncode (x, y) $ img
 
