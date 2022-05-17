@@ -4,12 +4,9 @@ algorithm.
 # Usage
 
 ```
-% ghc -O2 Encode
-% ./Encode 3 3 images/cat.jpg
-Generating blurhash for 1199x1198 image...
+% blurhash encode images/cat.jpg 3 3
 KYLDf7IA~p^+x]S5xvW=M|
-% ghc -O2 Decode
-% ./Decode "KYLDf7IA~p^+x]S5xvW=M|" 1199 1198 out.png
+% blurhash decode "KYLDf7IA~p^+x]S5xvW=M|" 1199 1198 -o out.png
 Saved image to out.png
 ```
 
